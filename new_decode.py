@@ -66,7 +66,7 @@ for racePos in possiblePos:
                 #exec("print("+n+",n)")
 
 
-            strats.append([(racePos,speed,time),(startOne,lengthOne,lengthTwo,startThree)])
+            strats.append([(lapPos,lap,speed,time),(startOne,lengthOne,lengthTwo,startThree)])
 
             # partTotal = 20; #Aantal delen per lap
             # partLength = 100; #Aantal punten per deel
@@ -97,13 +97,13 @@ trTA = a[int(len(a)*0.7):int(len(a)*1)]
 endTQ = q[int(len(q)*0.85):]
 endTA = a[int(len(a)*0.85):]
 
-x = tf.placeholder(dtype=tf.float32, shape=[None, 3])
+x = tf.placeholder(dtype=tf.float32, shape=[None, 4])
 y = tf.placeholder(dtype=tf.float32, shape=[None, 4])
 
 learning_rate = tf.placeholder(tf.float32, shape=[])
 
 def net(data):
-    hidden_l1 = {"w": tf.Variable(tf.random_normal([3, 100])), "b": tf.Variable(tf.random_normal([100]))}
+    hidden_l1 = {"w": tf.Variable(tf.random_normal([4, 100])), "b": tf.Variable(tf.random_normal([100]))}
     hidden_l2 = {"w": tf.Variable(tf.random_normal([100, 500])), "b": tf.Variable(tf.random_normal([500]))}
     hidden_l3 = {"w": tf.Variable(tf.random_normal([500, 700])), "b": tf.Variable(tf.random_normal([700]))}
     hidden_l4 = {"w": tf.Variable(tf.random_normal([700, 500])), "b": tf.Variable(tf.random_normal([500]))}
