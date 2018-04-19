@@ -7,6 +7,9 @@ import os
 
 batch = 100
 
+
+
+
 def variable_summaries(var):
   with tf.name_scope('summaries'):
     mean = tf.reduce_mean(var)
@@ -36,7 +39,7 @@ def calc(racePos, speed, time):
     dom = {}
     for i in range(0, np.size(strategy)):
         dom[domain[i]] = strategy[i]
-        #exec(eval("domain[i]") + '=strategy[i]')  # Python Magie
+        exec(eval("domain[i]") + '=strategy[i]')  # Python Magie
 
     partTotal = 3;  # Aantal delen per lap
     partLength = 100;  # Aantal punten per deel
@@ -46,25 +49,18 @@ def calc(racePos, speed, time):
 
     # Bereken de startpunten per deel, aanvankelijk van de variabele
 
-    startOnePoint = int(dom["startOne"] * partLength);
-    endOnePoint = int(dom["endOne"] * partLength);
+    startOnePoint = dom["startOne"];
+    endOnePoint = dom["endOne"];
 
-    startTwoPoint = int(dom["startTwo"] * partLength);
-    endTwoPoint = int(dom["endTwo"] * partLength);
+    startTwoPoint = dom["startTwo"];
+    endTwoPoint = dom["endTwo"];
 
-    startThreePoint = int(dom["startThree"] * partLength);
-    endThreePoint = int(dom["endThree"] * partLength);
+    startThreePoint = dom["startThree"];
+    endThreePoint = dom["endThree"];
 
-    #print(np.array([startOnePoint, endOnePoint, startTwoPoint, endTwoPoint, startThreePoint, endThreePoint]))
+    # print(np.array([startOnePoint,endOnePoint,startTwoPoint,endTwoPoint,startThreePoint,endThreePoint]))
 
-    result[int(1) - 1, startOnePoint:] = 1;
-    result[int(1) - 1, endOnePoint:] = 0;
-    result[int(2) - 1, startTwoPoint:] = 1;
-    result[int(2) - 1, endTwoPoint:] = 0;
-    result[int(3) - 1, startThreePoint:] = 1;
-    result[int(3) - 1, endThreePoint:] = 0;
-
-    return np.array(result)  # Dit is uiteindelijk je resultaat.
+    return np.array([startOnePoint,endOnePoint,startTwoPoint,endTwoPoint,startThreePoint,endThreePoint])
 
 
 
@@ -94,9 +90,9 @@ a = []
 for x in speedDif:
     for y in timeDif:
         for z in possiblePos:
-            data[(z,x,y)] = calc(z,x,y).flatten()
+            data[(z,x,y)] = calc(z,x,y)
             q.append((z,x,y))
-            a.append(calc(z,x,y).flatten())
+            a.append(calc(z,x,y))
 
 c = list(zip(q,a))
 
@@ -114,22 +110,26 @@ endTQ = q[int(len(q)*0.85):]
 endTA = a[int(len(a)*0.85):]
 
 x = tf.placeholder(dtype=tf.float32, shape=[None, 3])
-y = tf.placeholder(dtype=tf.float32, shape=[None, 300])
+y = tf.placeholder(dtype=tf.float32, shape=[None, 6])
 
 learning_rate = tf.placeholder(tf.float32, shape=[])
 
 def net(data):
     hidden_l1 = {"w": tf.Variable(tf.random_normal([3, 100])), "b": tf.Variable(tf.random_normal([100]))}
     hidden_l2 = {"w": tf.Variable(tf.random_normal([100, 500])), "b": tf.Variable(tf.random_normal([500]))}
-    hidden_l3 = {"w": tf.Variable(tf.random_normal([500, 700])), "b": tf.Variable(tf.random_normal([700]))}
-    hidden_l4 = {"w": tf.Variable(tf.random_normal([700, 500])), "b": tf.Variable(tf.random_normal([500]))}
-    output_l = {"w": tf.Variable(tf.random_normal([500, 300])), "b": tf.Variable(tf.random_normal([300]))}
+    hidden_l3 = {"w": tf.Variable(tf.random_normal([500, 1000])), "b": tf.Variable(tf.random_normal([1000]))}
+    hidden_l4 = {"w": tf.Variable(tf.random_normal([1000, 1000])), "b": tf.Variable(tf.random_normal([1000]))}
+    hidden_l5 = {"w": tf.Variable(tf.random_normal([1000, 300])), "b": tf.Variable(tf.random_normal([300]))}
+    hidden_l6 = {"w": tf.Variable(tf.random_normal([300, 30])), "b": tf.Variable(tf.random_normal([30]))}
+    output_l = {"w": tf.Variable(tf.random_normal([30, 6])), "b": tf.Variable(tf.random_normal([6]))}
 
     l1 = tf.nn.sigmoid(tf.matmul(data, hidden_l1["w"]) + hidden_l1["b"])
     l2 = tf.nn.sigmoid(tf.matmul(l1, hidden_l2["w"]) + hidden_l2["b"])
     l3 = tf.nn.sigmoid(tf.matmul(l2, hidden_l3["w"]) + hidden_l3["b"])
     l4 = tf.nn.sigmoid(tf.matmul(l3, hidden_l4["w"]) + hidden_l4["b"])
-    out = tf.matmul(l4, output_l["w"]) + output_l["b"]
+    l5 = tf.nn.sigmoid(tf.matmul(l4, hidden_l5["w"]) + hidden_l5["b"])
+    l6 = tf.nn.sigmoid(tf.matmul(l5, hidden_l6["w"]) + hidden_l6["b"])
+    out = tf.matmul(l6, output_l["w"]) + output_l["b"]
 
     return out
 
@@ -142,7 +142,7 @@ def train_net(x, y):
     merged = tf.summary.merge_all()
     test_writer = tf.summary.FileWriter('/test2')
 
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
+    optimizer = tf.train.AdamOptimizer().minimize(cost)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -153,14 +153,10 @@ def train_net(x, y):
         lr = 0.1
 
         lr_change = {10:0.01,100:0.001,300:0.0001,800:0.00005}
-        for epoch in range(1000):
-            if epoch in lr_change:
-                lr = lr_change[epoch]
-            for bt in range(int(len(trQ) / batch)):
-                bq = trQ[bt * batch:bt * batch + batch]
-                ba = trA[bt * batch:bt * batch + batch]
-                _, c = sess.run([optimizer, cost], feed_dict={x: bq, y: ba, learning_rate: lr})
-            # print(epoch, c)
+
+
+        for epoch in range(500):
+
             if epoch % 10 == 0:
                 loss = tf.losses.absolute_difference(predict, y)
                 loss = sess.run([loss], feed_dict={x: trQ, y: trA})
@@ -172,14 +168,23 @@ def train_net(x, y):
                 test_writer.add_summary(summary, epoch)
                 print(epoch,trainE[-1],testE[-1])
 
+            if epoch in lr_change:
+                lr = lr_change[epoch]
+            for bt in range(int(len(trQ) / batch)):
+                bq = trQ[bt * batch:bt * batch + batch]
+                ba = trA[bt * batch:bt * batch + batch]
+                _, c = sess.run([optimizer, cost], feed_dict={x: bq, y: ba, learning_rate: lr})
+            # print(epoch, c)
+
+
         p = sess.run([predict], feed_dict={x: trTQ, y: trTA})
         print(p[0].shape)
         a = 0
         for x in range(len(p[0])):
-            a += sum([1 for n in range(len(p[0][x])) if ((p[0][x][n]<0.5 and trTA[x][n] == 0) or (p[0][x][n] > 0.5 and trTA[x][n] == 1))])
-        print(a/p[0].shape[0]/p[0].shape[1]*100,'%')
+            a += sum([abs(p[0][x][l]-trTA[x][l]) for l in range(6)])
+        print(a/p[0].shape[0]/p[0].shape[1])
 
-        saver.save(sess, os.path.join(os.getcwd(),"trained_models/NN1.ckpt"))
+        saver.save(sess, os.path.join(os.getcwd(),"trained_models/NN2.ckpt"))
 
 
     plt.plot(testE)

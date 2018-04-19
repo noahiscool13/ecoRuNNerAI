@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from random import shuffle
 import os
 
+import time
+
 batch = 100
 
 def variable_summaries(var):
@@ -54,8 +56,6 @@ def calc(racePos, speed, time):
 
     startThreePoint = int(dom["startThree"] * partLength);
     endThreePoint = int(dom["endThree"] * partLength);
-
-    #print(np.array([startOnePoint, endOnePoint, startTwoPoint, endTwoPoint, startThreePoint, endThreePoint]))
 
     result[int(1) - 1, startOnePoint:] = 1;
     result[int(1) - 1, endOnePoint:] = 0;
@@ -113,17 +113,17 @@ trTA = a[int(len(a)*0.7):int(len(a)*1)]
 endTQ = q[int(len(q)*0.85):]
 endTA = a[int(len(a)*0.85):]
 
-x = tf.placeholder(dtype=tf.float32, shape=[None, 3])
-y = tf.placeholder(dtype=tf.float32, shape=[None, 300])
 
-learning_rate = tf.placeholder(tf.float32, shape=[])
+tf.reset_default_graph()
+
+hidden_l1 = {"w": tf.Variable(tf.random_normal([3, 100])), "b": tf.Variable(tf.random_normal([100]))}
+hidden_l2 = {"w": tf.Variable(tf.random_normal([100, 500])), "b": tf.Variable(tf.random_normal([500]))}
+hidden_l3 = {"w": tf.Variable(tf.random_normal([500, 700])), "b": tf.Variable(tf.random_normal([700]))}
+hidden_l4 = {"w": tf.Variable(tf.random_normal([700, 500])), "b": tf.Variable(tf.random_normal([500]))}
+output_l = {"w": tf.Variable(tf.random_normal([500, 300])), "b": tf.Variable(tf.random_normal([300]))}
 
 def net(data):
-    hidden_l1 = {"w": tf.Variable(tf.random_normal([3, 100])), "b": tf.Variable(tf.random_normal([100]))}
-    hidden_l2 = {"w": tf.Variable(tf.random_normal([100, 500])), "b": tf.Variable(tf.random_normal([500]))}
-    hidden_l3 = {"w": tf.Variable(tf.random_normal([500, 700])), "b": tf.Variable(tf.random_normal([700]))}
-    hidden_l4 = {"w": tf.Variable(tf.random_normal([700, 500])), "b": tf.Variable(tf.random_normal([500]))}
-    output_l = {"w": tf.Variable(tf.random_normal([500, 300])), "b": tf.Variable(tf.random_normal([300]))}
+
 
     l1 = tf.nn.sigmoid(tf.matmul(data, hidden_l1["w"]) + hidden_l1["b"])
     l2 = tf.nn.sigmoid(tf.matmul(l1, hidden_l2["w"]) + hidden_l2["b"])
@@ -133,61 +133,26 @@ def net(data):
 
     return out
 
+saver = tf.train.Saver()
 
-def train_net(x, y):
-    predict = net(x)
-    cost = tf.losses.mean_squared_error(predict, y)
-    loss = tf.losses.absolute_difference(predict, y)
-    tf.summary.scalar("loss",loss)
-    merged = tf.summary.merge_all()
-    test_writer = tf.summary.FileWriter('/test2')
-
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
-
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        saver = tf.train.Saver()
-        testE = []
-        trainE = []
-
-        lr = 0.1
-
-        lr_change = {10:0.01,100:0.001,300:0.0001,800:0.00005}
-        for epoch in range(1000):
-            if epoch in lr_change:
-                lr = lr_change[epoch]
-            for bt in range(int(len(trQ) / batch)):
-                bq = trQ[bt * batch:bt * batch + batch]
-                ba = trA[bt * batch:bt * batch + batch]
-                _, c = sess.run([optimizer, cost], feed_dict={x: bq, y: ba, learning_rate: lr})
-            # print(epoch, c)
-            if epoch % 10 == 0:
-                loss = tf.losses.absolute_difference(predict, y)
-                loss = sess.run([loss], feed_dict={x: trQ, y: trA})
-                trainE.append(loss)
-                loss = tf.losses.absolute_difference(predict, y)
-                loss = sess.run([loss], feed_dict={x: trTQ, y: trTA})
-                testE.append(loss)
-                summary = sess.run(merged, feed_dict={x: trTQ, y: trTA})
-                test_writer.add_summary(summary, epoch)
-                print(epoch,trainE[-1],testE[-1])
-
-        p = sess.run([predict], feed_dict={x: trTQ, y: trTA})
-        print(p[0].shape)
-        a = 0
-        for x in range(len(p[0])):
-            a += sum([1 for n in range(len(p[0][x])) if ((p[0][x][n]<0.5 and trTA[x][n] == 0) or (p[0][x][n] > 0.5 and trTA[x][n] == 1))])
-        print(a/p[0].shape[0]/p[0].shape[1]*100,'%')
-
-        saver.save(sess, os.path.join(os.getcwd(),"trained_models/NN1.ckpt"))
+with tf.Session() as sess:
+    completed = 0
+    saver.restore(sess, os.path.join(os.getcwd(), "trained_models/NN1.ckpt"))
+    t = 0
 
 
-    plt.plot(testE)
-    plt.plot(trainE)
+    im = []
+
+    n = []
+    for a in range(0,500,1):
+        n = []
+        dp = trQ[a]
+        q = net([dp]).eval()
+        for qq,x in enumerate(q[0]):
+            if x>0.50:
+                n.append(abs(1-trA[a][qq]))
+            else:
+                n.append(abs(0-trA[a][qq]))
+        im.append(n)
+    imgplotQ = plt.imshow(im)
     plt.show()
-
-
-
-
-train_net(x, y)
-
